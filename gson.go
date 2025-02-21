@@ -2,7 +2,7 @@ package gson
 
 import (
 	"fmt"
-	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"unicode"
@@ -403,29 +403,102 @@ func Parse(input string) (interface{}, error) {
 	return p.parse()
 }
 
-/**
- *
- * Main Function
- *
- */
-func main() {
-
-	args := os.Args
-	if len(args) < 2 {
-		fmt.Printf("USAGE: %s <filename>\n", args[0])
-		return
-	}
-
-	filename := args[1]
-
-	if filename == "" {
-		fmt.Printf("ERROR: Please provide valid filename\n")
-		return
-	}
-	data, err := os.ReadFile(filename)
+func Stringify(input interface{}) (string, error) {
+	var builder strings.Builder
+	err := stringifyValue(input, &builder)
 	if err != nil {
-		panic("ERROR: Not able to read the file")
+		return "", err
 	}
-	val, err := Parse(string(data))
-	fmt.Println(val)
+	return builder.String(), nil
+}
+
+func stringifyValue(in interface{}, builder *strings.Builder) error {
+
+	if in == nil {
+		builder.WriteString("null")
+		return nil
+	}
+
+	val := reflect.ValueOf(in)
+
+	switch val.Kind() {
+	case reflect.String:
+		builder.WriteString(`"` + val.String() + `"`)
+
+	case reflect.Int:
+		builder.WriteString(strconv.Itoa(int(val.Int())))
+
+	case reflect.Bool:
+		builder.WriteString(strconv.FormatBool(val.Bool()))
+
+	case reflect.Slice, reflect.Array:
+		builder.WriteString("[")
+		for i := 0; i < val.Len(); i++ {
+			if i > 0 {
+				builder.WriteString(",")
+			}
+			err := stringifyValue(val.Index(i).Interface(), builder)
+			if err != nil {
+				return err
+			}
+		}
+		builder.WriteString("]")
+		return nil
+	case reflect.Map:
+		builder.WriteString("{")
+		keys := val.MapKeys()
+		for i, keyVal := range keys {
+			if i > 0 {
+				builder.WriteString(",")
+			}
+
+			key := keyVal.Interface()
+
+			keyString, ok := key.(string)
+			if !ok {
+				return fmt.Errorf("map keys must be strings")
+			}
+
+			builder.WriteString(`"` + escapeString(keyString) + `":`)
+			err := stringifyValue(val.MapIndex(keyVal).Interface(), builder)
+			if err != nil {
+				return err
+			}
+		}
+		builder.WriteString("}")
+		return nil
+
+	default:
+		return fmt.Errorf("unsupported type: %v", val.Kind())
+	}
+	return nil
+}
+
+func escapeString(s string) string {
+	var builder strings.Builder
+	for _, r := range s {
+		switch r {
+		case '\\':
+			builder.WriteString(`\\`)
+		case '"':
+			builder.WriteString(`\"`)
+		case '\n':
+			builder.WriteString(`\n`)
+		case '\r':
+			builder.WriteString(`\r`)
+		case '\t':
+			builder.WriteString(`\t`)
+		case '\b':
+			builder.WriteString(`\b`)
+		case '\f':
+			builder.WriteString(`\f`)
+		default:
+			if r < 32 {
+				builder.WriteString(fmt.Sprintf(`\u%04X`, int(r)))
+			} else {
+				builder.WriteRune(r)
+			}
+		}
+	}
+	return builder.String()
 }

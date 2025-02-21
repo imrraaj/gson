@@ -119,6 +119,104 @@ func TestJSONParser(t *testing.T) {
 	}
 }
 
+func TestJSONStringify(t *testing.T) {
+	testCases := []struct {
+		name        string
+		input       interface{}
+		expected    string
+		expectError bool
+	}{
+		{
+			name:        "Empty Object",
+			input:       map[string]interface{}{},
+			expected:    "{}",
+			expectError: false,
+		},
+		{
+			name:        "Basic Object with One Key-Value Pair",
+			input:       map[string]interface{}{"key": "value"},
+			expected:    `{"key":"value"}`,
+			expectError: false,
+		},
+		{
+			name:        "Object with Number Value",
+			input:       map[string]interface{}{"key": 123},
+			expected:    `{"key":123}`,
+			expectError: false,
+		},
+		{
+			name:        "Object with Boolean Value",
+			input:       map[string]interface{}{"key": true},
+			expected:    `{"key":true}`,
+			expectError: false,
+		},
+		{
+			name:        "Object with Null Value",
+			input:       map[string]interface{}{"key": nil},
+			expected:    `{"key":null}`,
+			expectError: false,
+		},
+		{
+			name:        "Object with Multiple Key-Value Pairs",
+			input:       map[string]interface{}{"key1": "value1", "key2": 123, "key3": true},
+			expected:    `{"key1":"value1","key2":123,"key3":true}`,
+			expectError: false,
+		},
+		{
+			name:        "Nested Object",
+			input:       map[string]interface{}{"key1": map[string]interface{}{"nestedKey": "nestedValue"}},
+			expected:    `{"key1":{"nestedKey":"nestedValue"}}`,
+			expectError: false,
+		},
+		{
+			name:        "Empty Array",
+			input:       []interface{}{},
+			expected:    `[]`,
+			expectError: false,
+		},
+		{
+			name:        "Array with String Values",
+			input:       []interface{}{"value1", "value2", "value3"},
+			expected:    `["value1","value2","value3"]`,
+			expectError: false,
+		},
+		{
+			name:        "Array with Mixed Values",
+			input:       []interface{}{123, "value", true, nil},
+			expected:    `[123,"value",true,null]`,
+			expectError: false,
+		},
+		{
+			name:        "Array with Nested Object",
+			input:       []interface{}{map[string]interface{}{"nestedKey": "nestedValue"}},
+			expected:    `[{"nestedKey":"nestedValue"}]`,
+			expectError: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := Stringify(tc.input)
+
+			if tc.expectError {
+				if err == nil {
+					t.Fatalf("Expected error but got none for test case %s", tc.name)
+				}
+				return // Skip further checks if an error was expected
+			}
+
+			if err != nil {
+				t.Fatalf("Unexpected error for test case %s : %v", tc.name, err)
+				return // Skip further checks if an error occurred
+			}
+
+			if result != tc.expected {
+				t.Errorf("Results do not match for test case %s\nExpected:%s\nGot:%s", tc.name, tc.expected, result)
+			}
+		})
+	}
+}
+
 // compareResults checks if two interfaces are equal.
 func compareResults(result, expected interface{}) bool {
 	return fmt.Sprintf("%v", result) == fmt.Sprintf("%v", expected) // Simple comparison; replace with deep comparison if necessary
