@@ -1,6 +1,11 @@
 # GSON
 
+[![Library Status](https://github.com/imrraaj/gson/actions/workflows/go.yml/badge.svg)](https://github.com/imrraaj/gson/actions/workflows/go.yml)
 
-A JSON Parsing library written in Golang!
+A JSON parsing library written in Golang!
 
-Library created in 8 hours just for fun and recreational purposes
+## Description
+
+This library was created in 8 hours purely for fun and recreational purposes. It provides basic JSON parsing functionality in Go.
+> Benchmarks will be added soon!
+
