@@ -1,4 +1,4 @@
-package main
+package gson
 
 import (
 	"fmt"
@@ -8,14 +8,9 @@ import (
 	"unicode"
 )
 
-// JSON BNF Grammar
-// https://gist.github.com/EndingCredits/c12a9a99f87fd34d81df86b5588d3f1d
+// JSON BNF Grammar: https://gist.github.com/EndingCredits/c12a9a99f87fd34d81df86b5588d3f1d
 
-/**
- *
- * GLOBAL CONSTANTS
- *
- */
+/** GLOBAL CONSTANTS */
 const TOK_END = -1
 const (
 	TOK_NUMBER = iota
@@ -33,77 +28,74 @@ const (
 )
 
 /**
- *
- * Lexer Implementation
- *
+ * lexer Implementation
  */
-
-type Token struct {
-	Key   int
-	Value string
+type token struct {
+	key   int
+	value string
 }
 
-var literal_tokens = []Token{
-	{Value: "{", Key: TOK_OPEN_CURLY_PARAN},
-	{Value: "}", Key: TOK_CLOSE_CURLY_PARAN},
-	{Value: "[", Key: TOK_OPEN_SQ_PARAN},
-	{Value: "]", Key: TOK_CLOSE_SQ_PARAN},
-	{Value: ":", Key: TOK_COLON},
-	{Value: ",", Key: TOK_COMMA},
-	{Value: "true", Key: TOK_BOOL},
-	{Value: "false", Key: TOK_BOOL},
-	{Value: "null", Key: TOK_NULL},
+var literal_tokens = []token{
+	{value: "{", key: TOK_OPEN_CURLY_PARAN},
+	{value: "}", key: TOK_CLOSE_CURLY_PARAN},
+	{value: "[", key: TOK_OPEN_SQ_PARAN},
+	{value: "]", key: TOK_CLOSE_SQ_PARAN},
+	{value: ":", key: TOK_COLON},
+	{value: ",", key: TOK_COMMA},
+	{value: "true", key: TOK_BOOL},
+	{value: "false", key: TOK_BOOL},
+	{value: "null", key: TOK_NULL},
 }
 
-type Lexer struct {
-	Input  string
-	Cursor int
+type lexer struct {
+	input  string
+	cursor int
 }
 
-func (l *Lexer) Chop(n int) {
+func (l *lexer) chop(n int) {
 	for range n {
-		if l.Cursor >= len(l.Input) {
-			panic("Chop Invalid")
+		if l.cursor >= len(l.input) {
+			panic("chop Invalid")
 		}
-		l.Cursor = l.Cursor + 1
+		l.cursor = l.cursor + 1
 	}
 }
-func (l *Lexer) Next() Token {
+func (l *lexer) next() token {
 
-	t := Token{
-		Key:   TOK_END,
-		Value: "",
+	t := token{
+		key:   TOK_END,
+		value: "",
 	}
 
-	for l.Cursor < len(l.Input) && unicode.IsSpace(rune(l.Input[l.Cursor])) {
-		l.Chop(1)
+	for l.cursor < len(l.input) && unicode.IsSpace(rune(l.input[l.cursor])) {
+		l.chop(1)
 	}
 
-	if l.Cursor >= len(l.Input) {
+	if l.cursor >= len(l.input) {
 		return t
 	}
 
 	for _, lt := range literal_tokens {
-		tokenLength := len(lt.Value)
-		if l.Cursor+tokenLength <= len(l.Input) && string(l.Input[l.Cursor:l.Cursor+tokenLength]) == lt.Value {
-			t.Key = lt.Key
-			t.Value = lt.Value
-			l.Chop(tokenLength)
+		tokenLength := len(lt.value)
+		if l.cursor+tokenLength <= len(l.input) && string(l.input[l.cursor:l.cursor+tokenLength]) == lt.value {
+			t.key = lt.key
+			t.value = lt.value
+			l.chop(tokenLength)
 			return t
 		}
 	}
 
-	if l.Input[l.Cursor] == '"' {
-		l.Cursor++
+	if l.input[l.cursor] == '"' {
+		l.cursor++
 		var prev byte
 		var strBuilder strings.Builder
 
-		for l.Cursor < len(l.Input) {
-			current := l.Input[l.Cursor]
+		for l.cursor < len(l.input) {
+			current := l.input[l.cursor]
 
 			if current == '\\' && prev != '\\' {
 				prev = current
-				l.Cursor++
+				l.cursor++
 				continue
 			}
 
@@ -113,140 +105,140 @@ func (l *Lexer) Next() Token {
 
 			strBuilder.WriteByte(current)
 			prev = current
-			l.Cursor++
+			l.cursor++
 		}
-		t.Key = TOK_STRING
-		t.Value = strBuilder.String()
-		l.Chop(1) // chop ending quote
+		t.key = TOK_STRING
+		t.value = strBuilder.String()
+		l.chop(1) // chop ending quote
 		return t
 	}
 
-	if unicode.IsDigit(rune(l.Input[l.Cursor])) {
-		t.Key = TOK_NUMBER
-		tokenStart := l.Cursor
+	if unicode.IsDigit(rune(l.input[l.cursor])) {
+		t.key = TOK_NUMBER
+		tokenStart := l.cursor
 
-		for l.Cursor < len(l.Input) && unicode.IsDigit(rune(l.Input[l.Cursor])) {
-			l.Chop(1)
+		for l.cursor < len(l.input) && unicode.IsDigit(rune(l.input[l.cursor])) {
+			l.chop(1)
 		}
-		t.Value = string(l.Input[tokenStart:l.Cursor])
+		t.value = string(l.input[tokenStart:l.cursor])
 		return t
 	}
 
-	l.Cursor = l.Cursor + 1
-	fmt.Printf("ERROR: Invalid character %c", l.Input[l.Cursor])
+	l.cursor = l.cursor + 1
+	fmt.Printf("ERROR: Invalid character %c", l.input[l.cursor])
 	return t
 }
 
-func NewLexer(input string) Lexer {
-	return Lexer{
-		Input:  input,
-		Cursor: 0,
+func Newlexer(input string) lexer {
+	return lexer{
+		input:  input,
+		cursor: 0,
 	}
 }
 
 /**
  *
- * Parser Implementation
+ * parser Implementation
  *
  */
 
-type Parser struct {
-	tokens []Token
+type parser struct {
+	tokens []token
 	idx    int
 }
 
-func (p *Parser) peek() Token {
+func (p *parser) peek() token {
 	if p.idx < len(p.tokens) {
 		return p.tokens[p.idx]
 	}
-	return Token{}
+	return token{}
 }
 
-func (p *Parser) consume() {
+func (p *parser) consume() {
 	if p.idx < len(p.tokens) {
 		p.idx++
 	}
 }
 
-func (p *Parser) parseLiteral(expected string) error {
+func (p *parser) parseLiteral(expected string) error {
 	if p.idx >= len(p.tokens) {
 		return fmt.Errorf("expected '%s', but got end of input", expected)
 	}
 
-	currentToken := p.tokens[p.idx]
-	if currentToken.Value != expected {
-		return fmt.Errorf("expected '%s', but got '%s'", expected, currentToken.Value)
+	currenttoken := p.tokens[p.idx]
+	if currenttoken.value != expected {
+		return fmt.Errorf("expected '%s', but got '%s'", expected, currenttoken.value)
 	}
 	p.consume()
 	return nil
 }
 
-func (p *Parser) parseNumber() (int, error) {
+func (p *parser) parseNumber() (int, error) {
 	if p.idx >= len(p.tokens) {
 		return -1, fmt.Errorf("expected string, but got end of input")
 	}
 
-	if p.tokens[p.idx].Key != TOK_NUMBER {
-		return -1, fmt.Errorf("expected string, but got '%s'", p.tokens[p.idx].Value)
+	if p.tokens[p.idx].key != TOK_NUMBER {
+		return -1, fmt.Errorf("expected string, but got '%s'", p.tokens[p.idx].value)
 	}
-	value := p.tokens[p.idx].Value
+	value := p.tokens[p.idx].value
 	p.consume()
 	return strconv.Atoi(value)
 }
 
-func (p *Parser) parseString() (string, error) {
+func (p *parser) parseString() (string, error) {
 	if p.idx >= len(p.tokens) {
 		return "", fmt.Errorf("expected string, but got end of input")
 	}
 
-	if p.tokens[p.idx].Key != TOK_STRING {
-		return "", fmt.Errorf("expected string, but got '%s'", p.tokens[p.idx].Value)
+	if p.tokens[p.idx].key != TOK_STRING {
+		return "", fmt.Errorf("expected string, but got '%s'", p.tokens[p.idx].value)
 	}
-	value := p.tokens[p.idx].Value
+	value := p.tokens[p.idx].value
 	p.consume()
 	return value, nil
 }
 
-func (p *Parser) parseBool() (bool, error) {
+func (p *parser) parseBool() (bool, error) {
 	if p.idx >= len(p.tokens) {
 		return false, fmt.Errorf("expected string, but got end of input")
 	}
 
-	if p.tokens[p.idx].Key != TOK_BOOL {
-		return false, fmt.Errorf("expected string, but got '%s'", p.tokens[p.idx].Value)
+	if p.tokens[p.idx].key != TOK_BOOL {
+		return false, fmt.Errorf("expected string, but got '%s'", p.tokens[p.idx].value)
 	}
-	value := p.tokens[p.idx].Value
+	value := p.tokens[p.idx].value
 	p.consume()
 	return strconv.ParseBool(value)
 }
 
-func (p *Parser) parseNull() (interface{}, error) {
+func (p *parser) parseNull() (interface{}, error) {
 	if p.idx >= len(p.tokens) {
 		return -1, fmt.Errorf("expected string, but got end of input")
 	}
 
-	if p.tokens[p.idx].Key != TOK_NULL {
-		return -1, fmt.Errorf("expected string, but got '%s'", p.tokens[p.idx].Value)
+	if p.tokens[p.idx].key != TOK_NULL {
+		return -1, fmt.Errorf("expected string, but got '%s'", p.tokens[p.idx].value)
 	}
 	p.consume()
 	return nil, nil
 }
 
-func (p *Parser) parsePrimitive() (interface{}, error) {
+func (p *parser) parsePrimitive() (interface{}, error) {
 	// <number> | <string> | <boolean> | <null>
-	if err := p.peek(); err.Key == TOK_NUMBER {
+	if err := p.peek(); err.key == TOK_NUMBER {
 		return p.parseNumber()
-	} else if err := p.peek(); err.Key == TOK_STRING {
+	} else if err := p.peek(); err.key == TOK_STRING {
 		return p.parseString()
-	} else if err := p.peek(); err.Key == TOK_BOOL {
+	} else if err := p.peek(); err.key == TOK_BOOL {
 		return p.parseBool()
-	} else if err := p.peek(); err.Key == TOK_NULL {
+	} else if err := p.peek(); err.key == TOK_NULL {
 		return p.parseNull()
 	}
 	return nil, fmt.Errorf("ERROR: No valid primitive found")
 }
 
-func (p *Parser) parseMember() (map[string]interface{}, error) {
+func (p *parser) parseMember() (map[string]interface{}, error) {
 	// <string> ': ' <json>
 	key, err := p.parseString()
 	if err != nil {
@@ -257,7 +249,7 @@ func (p *Parser) parseMember() (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	value, err := p.Parse()
+	value, err := p.parse()
 	if err != nil {
 		return nil, err
 	}
@@ -265,7 +257,7 @@ func (p *Parser) parseMember() (map[string]interface{}, error) {
 	return map[string]interface{}{key: value}, nil
 }
 
-func (p *Parser) parseObject() (map[string]interface{}, error) {
+func (p *parser) parseObject() (map[string]interface{}, error) {
 	// '{' [ <member> *(', ' <member>) ] '}'
 
 	if p.idx >= len(p.tokens) {
@@ -279,14 +271,14 @@ func (p *Parser) parseObject() (map[string]interface{}, error) {
 	result := make(map[string]interface{})
 	firstElement := true
 	for {
-		currentToken := p.peek()
-		if currentToken.Value == "}" {
+		currenttoken := p.peek()
+		if currenttoken.value == "}" {
 			break
 		}
 
 		if !firstElement {
 			if err := p.parseLiteral(","); err != nil {
-				if currentToken.Value != "}" {
+				if currenttoken.value != "}" {
 					return nil, fmt.Errorf("Expected \",\" or \"}\" \n")
 				} else {
 					return nil, fmt.Errorf("Expected \",\" \n")
@@ -311,7 +303,7 @@ func (p *Parser) parseObject() (map[string]interface{}, error) {
 	return result, nil
 }
 
-func (p *Parser) parseArray() ([]interface{}, error) {
+func (p *parser) parseArray() ([]interface{}, error) {
 	// <array> ::= '[' [ <json> *(', ' <json>) ] ']'
 
 	if p.idx >= len(p.tokens) {
@@ -325,21 +317,21 @@ func (p *Parser) parseArray() ([]interface{}, error) {
 	var result []interface{}
 	firstElement := true
 	for {
-		currentToken := p.peek()
-		if currentToken.Value == "]" {
+		currenttoken := p.peek()
+		if currenttoken.value == "]" {
 			break
 		}
 
 		if !firstElement {
 			if err := p.parseLiteral(","); err != nil {
-				if currentToken.Value != "}" {
+				if currenttoken.value != "}" {
 					return nil, err
 				}
 				break
 			}
 		}
 
-		value, err := p.Parse()
+		value, err := p.parse()
 		if err != nil {
 			return nil, err
 		}
@@ -354,21 +346,21 @@ func (p *Parser) parseArray() ([]interface{}, error) {
 	return result, nil
 }
 
-func (p *Parser) parseContainer() (interface{}, error) {
+func (p *parser) parseContainer() (interface{}, error) {
 	// <container> ::= <object> | <array>
 
 	if p.idx >= len(p.tokens) {
 		return nil, fmt.Errorf("unexpected end of input")
 	}
 
-	currentToken := p.peek()
-	if currentToken.Value == "{" {
+	currenttoken := p.peek()
+	if currenttoken.value == "{" {
 		objMap, err := p.parseObject()
 		if err == nil {
 			return objMap, nil
 		}
 	}
-	if currentToken.Value == "[" {
+	if currenttoken.value == "[" {
 		arrList, err := p.parseArray()
 		if err == nil {
 			return arrList, nil
@@ -378,7 +370,7 @@ func (p *Parser) parseContainer() (interface{}, error) {
 	return nil, fmt.Errorf("ERROR: No object or array found")
 }
 
-func (p *Parser) Parse() (interface{}, error) {
+func (p *parser) parse() (interface{}, error) {
 	if p.idx >= len(p.tokens) {
 		return nil, fmt.Errorf("unexpected end of input")
 	}
@@ -395,19 +387,20 @@ func (p *Parser) Parse() (interface{}, error) {
 	return nil, fmt.Errorf("unsupported token type")
 }
 
-func NewParser(input string) Parser {
-	l := NewLexer(input)
-	tokens := make([]Token, 0)
+func Parse(input string) (interface{}, error) {
+	l := Newlexer(input)
+	tokens := make([]token, 0)
 	for {
-		t := l.Next()
-		if t.Key == TOK_END {
+		t := l.next()
+		if t.key == TOK_END {
 			break
 		}
 		tokens = append(tokens, t)
 	}
-	return Parser{
+	p := parser{
 		tokens: tokens,
 	}
+	return p.parse()
 }
 
 /**
@@ -433,7 +426,6 @@ func main() {
 	if err != nil {
 		panic("ERROR: Not able to read the file")
 	}
-	p := NewParser(string(data))
-	val, err := p.Parse()
+	val, err := Parse(string(data))
 	fmt.Println(val)
 }

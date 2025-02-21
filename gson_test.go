@@ -1,4 +1,4 @@
-package main
+package gson
 
 import (
 	"fmt"
@@ -100,8 +100,7 @@ func TestJSONParser(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			parser := NewParser(tc.input)
-			result, err := parser.Parse()
+			result, err := Parse(tc.input)
 
 			if tc.expectError {
 				if err == nil {

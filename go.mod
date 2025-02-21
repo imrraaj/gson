@@ -1,3 +1,3 @@
-module json
+module gson
 
 go 1.22.1
