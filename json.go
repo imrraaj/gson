@@ -1,8 +1,9 @@
-package main
+package json
 
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -50,6 +51,7 @@ var literal_tokens = []Token{
 	{Value: ",", Key: TOK_COMMA},
 	{Value: "true", Key: TOK_BOOL},
 	{Value: "false", Key: TOK_BOOL},
+	{Value: "null", Key: TOK_BOOL},
 }
 
 type Lexer struct {
@@ -179,88 +181,84 @@ func (p *Parser) parseLiteral(expected string) error {
 	return nil
 }
 
-func (p *Parser) parseNumber() error {
+func (p *Parser) parseNumber() (int, error) {
 	if p.idx >= len(p.tokens) {
-		return fmt.Errorf("expected string, but got end of input")
+		return -1, fmt.Errorf("expected string, but got end of input")
 	}
 
 	if p.tokens[p.idx].Key != TOK_NUMBER {
-		return fmt.Errorf("expected string, but got '%s'", p.tokens[p.idx].Value)
+		return -1, fmt.Errorf("expected string, but got '%s'", p.tokens[p.idx].Value)
 	}
+	value := p.tokens[p.idx].Value
 	p.consume()
-	return nil
+	return strconv.Atoi(value)
 }
 
-func (p *Parser) parseString() error {
+func (p *Parser) parseString() (string, error) {
 	if p.idx >= len(p.tokens) {
-		return fmt.Errorf("expected string, but got end of input")
+		return "", fmt.Errorf("expected string, but got end of input")
 	}
 
 	if p.tokens[p.idx].Key != TOK_STRING {
-		return fmt.Errorf("expected string, but got '%s'", p.tokens[p.idx].Value)
+		return "", fmt.Errorf("expected string, but got '%s'", p.tokens[p.idx].Value)
 	}
+	value := p.tokens[p.idx].Value
 	p.consume()
-	return nil
+	return value, nil
 }
 
-func (p *Parser) parseBool() error {
+func (p *Parser) parseBool() (bool, error) {
 	if p.idx >= len(p.tokens) {
-		return fmt.Errorf("expected string, but got end of input")
+		return false, fmt.Errorf("expected string, but got end of input")
 	}
 
 	if p.tokens[p.idx].Key != TOK_BOOL {
-		return fmt.Errorf("expected string, but got '%s'", p.tokens[p.idx].Value)
+		return false, fmt.Errorf("expected string, but got '%s'", p.tokens[p.idx].Value)
 	}
+	value := p.tokens[p.idx].Value
 	p.consume()
-	return nil
+	return strconv.ParseBool(value)
 }
 
-func (p *Parser) parsePrimitive() error {
+func (p *Parser) parsePrimitive() (interface{}, error) {
 	// <number> | <string> | <boolean>
-	err := p.parseNumber()
-	if err == nil {
-		return nil
+	if err := p.peek(); err.Key == TOK_NUMBER {
+		return p.parseNumber()
+	} else if err := p.peek(); err.Key == TOK_STRING {
+		return p.parseString()
+	} else if err := p.peek(); err.Key == TOK_BOOL {
+		return p.parseBool()
 	}
-
-	err = p.parseString()
-	if err == nil {
-		return nil
-	}
-	err = p.parseBool()
-	if err == nil {
-		return nil
-	}
-	return fmt.Errorf("ERROR: No number, string or boolean found")
+	return nil, fmt.Errorf("ERROR: No valid primitive found")
 }
 
-func (p *Parser) parseMember() error {
+func (p *Parser) parseMember() (map[string]interface{}, error) {
 	// <string> ': ' <json>
-	err := p.parseString()
+	key, err := p.parseString()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	err = p.parseLiteral(":")
-	if err != nil {
-		return err
+	if err = p.parseLiteral(":"); err != nil {
+		return nil, err
 	}
 
-	err = p.Parse()
+	value, err := p.Parse()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return map[string]interface{}{key: value}, nil
 }
 
-func (p *Parser) parseObject() error {
+func (p *Parser) parseObject() (map[string]interface{}, error) {
 	// '{' [ <member> *(', ' <member>) ] '}'
 
-	err := p.parseLiteral("{")
-	if err != nil {
-		return err
+	if err := p.parseLiteral("{"); err != nil {
+		return nil, err
 	}
 
+	result := make(map[string]interface{})
 	firstElement := true
 	for {
 		currentToken := p.peek()
@@ -269,38 +267,40 @@ func (p *Parser) parseObject() error {
 		}
 
 		if !firstElement {
-			err = p.parseLiteral(",")
-			if err != nil {
+
+			if err := p.parseLiteral(","); err != nil {
 				if currentToken.Value != "}" {
-					return err
+					return nil, err
 				}
 				break
 			}
 		}
 
-		err = p.parseMember()
+		member, err := p.parseMember()
 		if err != nil {
-			return err
+			return nil, err
+		}
+		for k, v := range member {
+			result[k] = v
 		}
 
 		firstElement = false
 	}
 
-	err = p.parseLiteral("}")
-	if err != nil {
-		return err
+	if err := p.parseLiteral("}"); err != nil {
+		return nil, err
 	}
-	return nil
+	return result, nil
 }
 
-func (p *Parser) parseArray() error {
+func (p *Parser) parseArray() ([]interface{}, error) {
 	// <array> ::= '[' [ <json> *(', ' <json>) ] ']'
 
-	err := p.parseLiteral("[")
-	if err != nil {
-		return err
+	if err := p.parseLiteral("["); err != nil {
+		return nil, err
 	}
 
+	var result []interface{}
 	firstElement := true
 	for {
 		currentToken := p.peek()
@@ -309,60 +309,58 @@ func (p *Parser) parseArray() error {
 		}
 
 		if !firstElement {
-			err = p.parseLiteral(",")
-			if err != nil {
-				// If comma is missing but we still have tokens, it could be an error
-				if currentToken.Value != "]" {
-					return err
+			if err := p.parseLiteral(","); err != nil {
+				if currentToken.Value != "}" {
+					return nil, err
 				}
-				break // Allow missing comma before closing bracket
+				break
 			}
 		}
 
-		err = p.Parse()
+		value, err := p.Parse()
 		if err != nil {
-			return err
+			return nil, err
 		}
 
+		result = append(result, value)
 		firstElement = false
 	}
 
-	err = p.parseLiteral("]")
-	if err != nil {
-		return err
+	if err := p.parseLiteral("]"); err != nil {
+		return nil, err
 	}
-	return nil
+	return result, nil
 }
 
-func (p *Parser) parseContainer() error {
+func (p *Parser) parseContainer() (interface{}, error) {
 	// <container> ::= <object> | <array>
-	err := p.parseObject()
+	objMap, err := p.parseObject()
 	if err == nil {
-		return nil
+		return objMap, nil
 	}
 
-	err = p.parseArray()
+	arrList, err := p.parseArray()
 	if err == nil {
-		return nil
+		return arrList, nil
 	}
-	return fmt.Errorf("ERROR: No object or array found")
+	return nil, fmt.Errorf("ERROR: No object or array found")
 }
 
-func (p *Parser) Parse() error {
+func (p *Parser) Parse() (interface{}, error) {
 	if p.idx >= len(p.tokens) {
-		return fmt.Errorf("unexpected end of input")
+		return nil, fmt.Errorf("unexpected end of input")
 	}
 
-	err := p.parsePrimitive()
+	primitive, err := p.parsePrimitive()
 	if err == nil {
-		return nil
+		return primitive, nil
 	}
-	err = p.parseContainer()
+	container, err := p.parseContainer()
 	if err == nil {
-		return nil
+		return container, nil
 	}
 
-	return fmt.Errorf("unsupported token type: %s", p.tokens[p.idx].Value)
+	return nil, fmt.Errorf("unsupported token type: %s", p.tokens[p.idx].Value)
 }
 
 func NewParser(input string) Parser {
@@ -404,5 +402,6 @@ func main() {
 		panic("ERROR: Not able to read the file")
 	}
 	p := NewParser(string(data))
-	p.Parse()
+	val, err := p.Parse()
+	fmt.Println(val)
 }
