@@ -120,7 +120,16 @@ func (l *lexer) next() token {
 		for l.cursor < len(l.input) && unicode.IsDigit(rune(l.input[l.cursor])) {
 			l.chop(1)
 		}
+
+		if l.cursor < len(l.input) && rune(l.input[l.cursor]) == '.' {
+			l.chop(1)
+
+			for l.cursor < len(l.input) && unicode.IsDigit(rune(l.input[l.cursor])) {
+				l.chop(1)
+			}
+		}
 		t.value = string(l.input[tokenStart:l.cursor])
+		fmt.Println(t.value)
 		return t
 	}
 
@@ -173,17 +182,17 @@ func (p *parser) parseLiteral(expected string) error {
 	return nil
 }
 
-func (p *parser) parseNumber() (int, error) {
+func (p *parser) parseNumber() (float64, error) {
 	if p.idx >= len(p.tokens) {
-		return -1, fmt.Errorf("expected string, but got end of input")
+		return -1, fmt.Errorf("expected number, but got end of input")
 	}
 
 	if p.tokens[p.idx].key != tok_number {
-		return -1, fmt.Errorf("expected string, but got '%s'", p.tokens[p.idx].value)
+		return -1, fmt.Errorf("expected number, but got '%s'", p.tokens[p.idx].value)
 	}
 	value := p.tokens[p.idx].value
 	p.consume()
-	return strconv.Atoi(value)
+	return strconv.ParseFloat(value, 64)
 }
 
 func (p *parser) parseString() (string, error) {
@@ -201,11 +210,11 @@ func (p *parser) parseString() (string, error) {
 
 func (p *parser) parseBool() (bool, error) {
 	if p.idx >= len(p.tokens) {
-		return false, fmt.Errorf("expected string, but got end of input")
+		return false, fmt.Errorf("expected boolean, but got end of input")
 	}
 
 	if p.tokens[p.idx].key != tok_bool {
-		return false, fmt.Errorf("expected string, but got '%s'", p.tokens[p.idx].value)
+		return false, fmt.Errorf("expected boolean, but got '%s'", p.tokens[p.idx].value)
 	}
 	value := p.tokens[p.idx].value
 	p.consume()
