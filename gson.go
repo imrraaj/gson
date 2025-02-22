@@ -11,20 +11,20 @@ import (
 // JSON BNF Grammar: https://gist.github.com/EndingCredits/c12a9a99f87fd34d81df86b5588d3f1d
 
 /** GLOBAL CONSTANTS */
-const TOK_END = -1
+const tok_end = -1
 const (
-	TOK_NUMBER = iota
-	TOK_STRING
-	TOK_BOOL
-	TOK_NULL
+	tok_number = iota
+	tok_string
+	tok_bool
+	tok_null
 
-	TOK_OPEN_SQ_PARAN
-	TOK_CLOSE_SQ_PARAN
-	TOK_OPEN_CURLY_PARAN
-	TOK_CLOSE_CURLY_PARAN
+	tok_open_sq_paran
+	tok_close_sq_paran
+	tok_open_curly_paran
+	tok_close_curly_paran
 
-	TOK_COMMA
-	TOK_COLON
+	tok_comma
+	tok_colon
 )
 
 /**
@@ -36,15 +36,15 @@ type token struct {
 }
 
 var literal_tokens = []token{
-	{value: "{", key: TOK_OPEN_CURLY_PARAN},
-	{value: "}", key: TOK_CLOSE_CURLY_PARAN},
-	{value: "[", key: TOK_OPEN_SQ_PARAN},
-	{value: "]", key: TOK_CLOSE_SQ_PARAN},
-	{value: ":", key: TOK_COLON},
-	{value: ",", key: TOK_COMMA},
-	{value: "true", key: TOK_BOOL},
-	{value: "false", key: TOK_BOOL},
-	{value: "null", key: TOK_NULL},
+	{value: "{", key: tok_open_curly_paran},
+	{value: "}", key: tok_close_curly_paran},
+	{value: "[", key: tok_open_sq_paran},
+	{value: "]", key: tok_close_sq_paran},
+	{value: ":", key: tok_colon},
+	{value: ",", key: tok_comma},
+	{value: "true", key: tok_bool},
+	{value: "false", key: tok_bool},
+	{value: "null", key: tok_null},
 }
 
 type lexer struct {
@@ -63,7 +63,7 @@ func (l *lexer) chop(n int) {
 func (l *lexer) next() token {
 
 	t := token{
-		key:   TOK_END,
+		key:   tok_end,
 		value: "",
 	}
 
@@ -107,14 +107,14 @@ func (l *lexer) next() token {
 			prev = current
 			l.cursor++
 		}
-		t.key = TOK_STRING
+		t.key = tok_string
 		t.value = strBuilder.String()
 		l.chop(1) // chop ending quote
 		return t
 	}
 
 	if unicode.IsDigit(rune(l.input[l.cursor])) {
-		t.key = TOK_NUMBER
+		t.key = tok_number
 		tokenStart := l.cursor
 
 		for l.cursor < len(l.input) && unicode.IsDigit(rune(l.input[l.cursor])) {
@@ -129,7 +129,7 @@ func (l *lexer) next() token {
 	return t
 }
 
-func Newlexer(input string) lexer {
+func newlexer(input string) lexer {
 	return lexer{
 		input:  input,
 		cursor: 0,
@@ -178,7 +178,7 @@ func (p *parser) parseNumber() (int, error) {
 		return -1, fmt.Errorf("expected string, but got end of input")
 	}
 
-	if p.tokens[p.idx].key != TOK_NUMBER {
+	if p.tokens[p.idx].key != tok_number {
 		return -1, fmt.Errorf("expected string, but got '%s'", p.tokens[p.idx].value)
 	}
 	value := p.tokens[p.idx].value
@@ -191,7 +191,7 @@ func (p *parser) parseString() (string, error) {
 		return "", fmt.Errorf("expected string, but got end of input")
 	}
 
-	if p.tokens[p.idx].key != TOK_STRING {
+	if p.tokens[p.idx].key != tok_string {
 		return "", fmt.Errorf("expected string, but got '%s'", p.tokens[p.idx].value)
 	}
 	value := p.tokens[p.idx].value
@@ -204,7 +204,7 @@ func (p *parser) parseBool() (bool, error) {
 		return false, fmt.Errorf("expected string, but got end of input")
 	}
 
-	if p.tokens[p.idx].key != TOK_BOOL {
+	if p.tokens[p.idx].key != tok_bool {
 		return false, fmt.Errorf("expected string, but got '%s'", p.tokens[p.idx].value)
 	}
 	value := p.tokens[p.idx].value
@@ -217,7 +217,7 @@ func (p *parser) parseNull() (interface{}, error) {
 		return -1, fmt.Errorf("expected string, but got end of input")
 	}
 
-	if p.tokens[p.idx].key != TOK_NULL {
+	if p.tokens[p.idx].key != tok_null {
 		return -1, fmt.Errorf("expected string, but got '%s'", p.tokens[p.idx].value)
 	}
 	p.consume()
@@ -226,13 +226,13 @@ func (p *parser) parseNull() (interface{}, error) {
 
 func (p *parser) parsePrimitive() (interface{}, error) {
 	// <number> | <string> | <boolean> | <null>
-	if err := p.peek(); err.key == TOK_NUMBER {
+	if err := p.peek(); err.key == tok_number {
 		return p.parseNumber()
-	} else if err := p.peek(); err.key == TOK_STRING {
+	} else if err := p.peek(); err.key == tok_string {
 		return p.parseString()
-	} else if err := p.peek(); err.key == TOK_BOOL {
+	} else if err := p.peek(); err.key == tok_bool {
 		return p.parseBool()
-	} else if err := p.peek(); err.key == TOK_NULL {
+	} else if err := p.peek(); err.key == tok_null {
 		return p.parseNull()
 	}
 	return nil, fmt.Errorf("ERROR: No valid primitive found")
@@ -388,11 +388,11 @@ func (p *parser) parse() (interface{}, error) {
 }
 
 func Parse(input string) (interface{}, error) {
-	l := Newlexer(input)
+	l := newlexer(input)
 	tokens := make([]token, 0)
 	for {
 		t := l.next()
-		if t.key == TOK_END {
+		if t.key == tok_end {
 			break
 		}
 		tokens = append(tokens, t)
